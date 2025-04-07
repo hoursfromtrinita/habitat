@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Grid Layout</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #f2f2f2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        svg {
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <svg id="mainCanvas" viewBox="0 0 400 400">
+        <defs>
+            <filter id="morphFilter">
+                <!-- Simple blur for fillet-like bevel -->
+                <feGaussianBlur in="SourceGraphic" stdDeviation="1" result="blur"/>
+                
+                <!-- Sharp threshold to create fillet effect -->
+                <feColorMatrix in="blur" type="matrix" values="
+                    1 0 0 0 0
+                    0 1 0 0 0
+                    0 0 1 0 0
+                    0 0 0 25 -5" result="threshold"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <script>
+        const svg = document.getElementById('mainCanvas');
+        const SQUARE_SIZE = 20; // Strict square size
+        let targetX = 200;
+        let targetY = 200;
+        let mouseX = 200;
+        let mouseY = 200;
+        let squares = [];
+        let animationFrame;
+
+        function lerp(start, end, factor) {
+            return start + (end - start) * factor;
+        }
+
+        function animate() {
+            // Smooth interpolation towards target position
+            mouseX = lerp(mouseX, targetX, 0.1);
+            mouseY = lerp(mouseY, targetY, 0.1);
+            
+            updateSquares();
+            animationFrame = requestAnimationFrame(animate);
+        }
+
+        // Track mouse position
+        document.addEventListener('mousemove', (e) => {
+            const rect = svg.getBoundingClientRect();
+            targetX = ((e.clientX - rect.left) / rect.width) * 400;
+            targetY = ((e.clientY - rect.top) / rect.height) * 400;
+        });
+
+        function calculateScale(x, y) {
+            const dx = x - mouseX;
+            const dy = y - mouseY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const maxDistance = 200; // Full viewbox size for normalization
+            const normalizedDist = Math.min(distance / maxDistance, 1);
+            
+            const maxScale = 2.2;
+            const minScale = 0.5;
+            return minScale + (maxScale - minScale) * Math.exp(-2.5 * normalizedDist);
+        }
+
+        function calculateRadius(x, y) {
+            const dx = x - mouseX;
+            const dy = y - mouseY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const maxDistance = 600;
+            const normalizedDist = Math.min(distance / maxDistance, 1);
+            
+            const maxRadius = 50;
+            return maxRadius * normalizedDist; // Linear increase with distance
+        }
+
+        function updateSquares() {
+            squares.forEach(square => {
+                const scale = calculateScale(square.centerX, square.centerY);
+                const radius = calculateRadius(square.centerX, square.centerY);
+                const scaledSize = SQUARE_SIZE * scale;
+                const offsetX = (scaledSize - SQUARE_SIZE) / 2;
+                const offsetY = (scaledSize - SQUARE_SIZE) / 2;
+                
+                square.element.setAttribute("width", scaledSize);
+                square.element.setAttribute("height", scaledSize);
+                square.element.setAttribute("x", square.baseX - offsetX);
+                square.element.setAttribute("y", square.baseY - offsetY);
+                square.element.setAttribute("rx", radius);
+                square.element.setAttribute("ry", radius);
+            });
+        }
+
+        function createGrid(container, totalSize, gridSize) {
+            // Create a group for the grid with the morph filter
+            const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            group.setAttribute("filter", "url(#morphFilter)");
+            container.appendChild(group);
+            
+            // Calculate spacing between squares
+            const totalSpacing = totalSize - (gridSize * SQUARE_SIZE);
+            const spacing = totalSpacing / (gridSize - 1);
+            
+            // Center the entire grid in the 400x400 viewBox
+            const startX = (400 - totalSize) / 2;
+            const startY = (400 - totalSize) / 2;
+            
+            for (let row = 0; row < gridSize; row++) {
+                for (let col = 0; col < gridSize; col++) {
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    const baseX = startX + (col * (SQUARE_SIZE + spacing));
+                    const baseY = startY + (row * (SQUARE_SIZE + spacing));
+                    const centerX = baseX + SQUARE_SIZE / 2;
+                    const centerY = baseY + SQUARE_SIZE / 2;
+
+                    rect.setAttribute("x", baseX);
+                    rect.setAttribute("y", baseY);
+                    rect.setAttribute("width", SQUARE_SIZE);
+                    rect.setAttribute("height", SQUARE_SIZE);
+                    rect.setAttribute("fill", "#ffffff");
+                    group.appendChild(rect);
+
+                    squares.push({
+                        element: rect,
+                        baseX: baseX,
+                        baseY: baseY,
+                        centerX: centerX,
+                        centerY: centerY
+                    });
+                }
+            }
+        }
+
+        // Create the outer grid (200x200, 4x4)
+        createGrid(svg, 200, 4);
+
+        // Create the inner grid (140x140, 3x3)
+        createGrid(svg, 140, 3);
+
+        // Start animation loop
+        animate();
+    </script>
+</body>
+</html> 

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Pattern Layout</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: transparent;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        svg {
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <svg id="mainCanvas" viewBox="0 0 400 400">
+        <defs>
+            <pattern id="gridPattern" x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
+                <g id="patternGroup">
+                    <!-- Pattern content will be added here by JavaScript -->
+                </g>
+            </pattern>
+        </defs>
+        <!-- Background rectangle that will be filled with the pattern -->
+        <rect x="0" y="0" width="400" height="400" fill="url(#gridPattern)"/>
+    </svg>
+
+    <script>
+        const svg = document.getElementById('mainCanvas');
+        const patternGroup = document.getElementById('patternGroup');
+        const SQUARE_SIZE = 4; // Scaled down size
+        let targetX = 40;
+        let targetY = 40;
+        let mouseX = 40;
+        let mouseY = 40;
+        let squares = [];
+        let animationFrame;
+
+        function lerp(start, end, factor) {
+            return start + (end - start) * factor;
+        }
+
+        function animate() {
+            mouseX = lerp(mouseX, targetX, 0.1);
+            mouseY = lerp(mouseY, targetY, 0.1);
+            updateSquares();
+            animationFrame = requestAnimationFrame(animate);
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            const rect = svg.getBoundingClientRect();
+            // Map mouse position to pattern space
+            targetX = ((e.clientX - rect.left) / rect.width) * 80;
+            targetY = ((e.clientY - rect.top) / rect.height) * 80;
+        });
+
+        function calculateScale(x, y) {
+            const dx = x - mouseX;
+            const dy = y - mouseY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const maxDistance = 40;
+            const normalizedDist = Math.min(distance / maxDistance, 1);
+            
+            const maxScale = 2.2;
+            const minScale = 0.5;
+            return minScale + (maxScale - minScale) * Math.exp(-2.5 * normalizedDist);
+        }
+
+        function calculateRadius(x, y) {
+            const dx = x - mouseX;
+            const dy = y - mouseY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const maxDistance = 120;
+            const normalizedDist = Math.min(distance / maxDistance, 1);
+            
+            const maxRadius = 10;
+            return maxRadius * normalizedDist;
+        }
+
+        function updateSquares() {
+            squares.forEach(square => {
+                const scale = calculateScale(square.centerX, square.centerY);
+                const radius = calculateRadius(square.centerX, square.centerY);
+                const scaledSize = SQUARE_SIZE * scale;
+                const offsetX = (scaledSize - SQUARE_SIZE) / 2;
+                const offsetY = (scaledSize - SQUARE_SIZE) / 2;
+                
+                square.element.setAttribute("width", scaledSize);
+                square.element.setAttribute("height", scaledSize);
+                square.element.setAttribute("x", square.baseX - offsetX);
+                square.element.setAttribute("y", square.baseY - offsetY);
+                square.element.setAttribute("rx", radius);
+                square.element.setAttribute("ry", radius);
+            });
+        }
+
+        function createGrid(container, totalSize, gridSize) {
+            const totalSpacing = totalSize - (gridSize * SQUARE_SIZE);
+            const spacing = totalSpacing / (gridSize - 1);
+            const startX = (80 - totalSize) / 2; // Centered in 80x80 pattern
+            const startY = (80 - totalSize) / 2;
+            
+            for (let row = 0; row < gridSize; row++) {
+                for (let col = 0; col < gridSize; col++) {
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    const baseX = startX + (col * (SQUARE_SIZE + spacing));
+                    const baseY = startY + (row * (SQUARE_SIZE + spacing));
+                    const centerX = baseX + SQUARE_SIZE / 2;
+                    const centerY = baseY + SQUARE_SIZE / 2;
+
+                    rect.setAttribute("x", baseX);
+                    rect.setAttribute("y", baseY);
+                    rect.setAttribute("width", SQUARE_SIZE);
+                    rect.setAttribute("height", SQUARE_SIZE);
+                    rect.setAttribute("fill", "#000000");
+                    container.appendChild(rect);
+
+                    squares.push({
+                        element: rect,
+                        baseX: baseX,
+                        baseY: baseY,
+                        centerX: centerX,
+                        centerY: centerY
+                    });
+                }
+            }
+        }
+
+        // Create the outer grid (40x40, 4x4) - scaled down for pattern
+        createGrid(patternGroup, 40, 4);
+
+        // Create the inner grid (28x28, 3x3) - scaled down for pattern
+        createGrid(patternGroup, 28, 3);
+
+        // Start animation loop
+        animate();
+    </script>
+</body>
+</html> 
